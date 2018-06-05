@@ -2,7 +2,7 @@
 ## This script will set up an ssh tunnel and set this computer up as a router
 ## to route all traffic through the tunnel.
 ##
-## Author: benkillin
+## Author: benkillin 
 ## Date: 14 September 2010
 ## File: ssh_tunnel_endpoint.sh
 ##
@@ -14,9 +14,15 @@
 ## This script is for machine A in that ubuntu example document.
 ## This script must be run as root.
 
-localTunAddr="10.0.0.100";
+ssh="/usr/bin/ssh -C4c arcfour,blowfish-cbc";
+sshport="22";
+sshKey="/asdfasdfasdf/.ssh/id_rsa";
 
-remoteTunAddr="10.0.0.200";
+endpoint="xxx.xxx.xxx.xxx";
+
+localTunAddr="10.0.69.101";
+
+remoteTunAddr="10.0.69.201";
 remoteTunNATAddr="${remoteTunAddr}/32";
 
 tunnelIf="tun0";
@@ -24,27 +30,34 @@ internetIf="eth0";
 
 if [ "$1" == "up" ] ;
 then
-        ifconfig $tunnelIf $localTunAddr pointopoint $remoteTunAddr
+    
+    if [ "$2" == "reverse" ] ;
+    then
+        $ssh -NTCf -w 0:0 -p $sshport -i $sshKey $endpoint
+    fi
 
-        arp -sD $remoteTunAddr $internetIf pub
+	ifconfig $tunnelIf $localTunAddr pointopoint $remoteTunAddr
+	
+	arp -sD $remoteTunAddr $internetIf pub
+	
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
 
-        echo 1 > /proc/sys/net/ipv4/ip_forward
-        echo 1 > /proc/sys/net/ipv4/conf/all/forwarding
-
-        iptables --table nat --flush
+	iptables --table nat --flush
 
 # TODO: Figure out how to make this firewall rule work with DROP
 
-        iptables -P FORWARD ACCEPT
-        iptables -t nat -A POSTROUTING -o $internetIf -s $remoteTunNATAddr -j MASQUERADE
-#       iptables -A FORWARD -i $internetIf -m state --state NEW,INVALID -j DROP
+	iptables -P FORWARD ACCEPT
+	iptables -t nat -A POSTROUTING -o $internetIf -s $remoteTunNATAddr -j MASQUERADE
 else
-        echo 0 > /proc/sys/net/ipv4/ip_forward
-        echo 0 > /proc/sys/net/ipv4/conf/all/forwarding
-
-        iptables --table nat --flush
-        iptables -F FORWARD
-        iptables -P FORWARD DROP
-
-        /etc/init.d/firewall restart
+	echo 0 > /proc/sys/net/ipv4/ip_forward
+	echo 0 > /proc/sys/net/ipv4/conf/all/forwarding
+	
+	iptables --table nat --flush
+	iptables -F FORWARD
+	iptables -P FORWARD DROP
+	
+	/etc/init.d/firewall restart
 fi
+
+
